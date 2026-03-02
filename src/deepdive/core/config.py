@@ -1,13 +1,15 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
+
 class Settings(BaseSettings):
     """
     Application Settings Configured via Environment Variables.
     """
+
     project_name: str = "DeepDive RAG Agent"
     version: str = "0.1.0"
-    
+
     # Postgres pgvector Settings
     postgres_user: str = Field(default="postgres")
     postgres_password: str = Field(default="postgres")
@@ -20,12 +22,20 @@ class Settings(BaseSettings):
 
     # External LLM / Ingestion API
     llm_api_base: str = Field(default="http://localhost:8000/v1")
+    embedding_model: str = Field(default="nomic-embed-text")  # 768-dim
     llm_api_key: str = Field(default="dummy")
+    use_local_embeddings: bool = Field(default=False)
+
+    # Local Embedding Settings
+    embedding_device: str = Field(default="auto")  # "auto", "cpu", "cuda"
+    embedding_batch_size: int = Field(default=32)
+    embedding_trust_remote_code: bool = Field(default=False)
 
     @property
     def database_url(self) -> str:
         return f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+
 
 settings = Settings()
