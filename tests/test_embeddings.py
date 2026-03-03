@@ -7,12 +7,7 @@ these tests run without a live stack.
 import pytest
 from httpx import ASGITransport, AsyncClient
 from deepdive.main import app
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-FAKE_VECTOR = [0.1] * 768  # matches Vector(768) dimension
+from conftest import FAKE_VECTOR
 
 
 # ---------------------------------------------------------------------------
@@ -28,7 +23,8 @@ async def test_create_pubmed_embedding_success(monkeypatch):
     async def mock_embed_text(text: str):
         return FAKE_VECTOR
 
-    async def mock_insert(db, pmid, title, content, embedding):
+    async def mock_insert(*, db, pmid, title, content, embedding):
+        """Mock matching the keyword-argument call convention in routes.py."""
         from deepdive.db.models import PubMedAbstract
         obj = PubMedAbstract(id=1, pmid=pmid, title=title, content=content, embedding=embedding)
         return obj
@@ -149,3 +145,46 @@ async def test_augment_indications_query_embed_failure(monkeypatch):
         response = await ac.get("/api/indications", params={"question": "aspirin risks"})
 
     assert response.status_code == 502
+
+
+# ---------------------------------------------------------------------------
+# HTTP 500 fallback — generic (non-RuntimeError) exception handling
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_create_pubmed_embedding_generic_error(monkeypatch):
+    """
+    Verify that a non-RuntimeError exception in the embedding pipeline
+    surfaces as HTTP 500 (the generic catch-all in routes.py).
+    """
+    async def mock_embed_text_value_error(text: str):
+        raise ValueError("Unexpected data format")
+
+    import deepdive.api.routes as routes_module
+    monkeypatch.setattr(routes_module, "embed_text", mock_embed_text_value_error)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        response = await ac.post(
+            "/api/embeddings",
+            json={"pmid": "123", "title": "Test", "abstract": "Test abstract."},
+        )
+
+    assert response.status_code == 500
+
+
+@pytest.mark.asyncio
+async def test_augment_indications_query_generic_error(monkeypatch):
+    """
+    Verify that a non-RuntimeError exception in the query pipeline
+    surfaces as HTTP 500 (the generic catch-all in routes.py).
+    """
+    async def mock_embed_text_type_error(text: str):
+        raise TypeError("Bad type in embedding computation")
+
+    import deepdive.api.routes as routes_module
+    monkeypatch.setattr(routes_module, "embed_text", mock_embed_text_type_error)
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        response = await ac.get("/api/indications", params={"question": "aspirin risks"})
+
+    assert response.status_code == 500
