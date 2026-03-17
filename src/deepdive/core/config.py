@@ -1,3 +1,4 @@
+from typing import Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
@@ -23,6 +24,13 @@ class Settings(BaseSettings):
     # External LLM / Ingestion API
     llm_api_base: str = Field(default="http://localhost:8000/v1")
     llm_api_key: str = Field(default="dummy")
+
+    # Embedding settings
+    embedding_backend: Literal["local", "openai"] = Field(default="local")
+    embedding_model: str = Field(default="all-MiniLM-L6-v2")
+
+    # LLM completion settings
+    llm_model: str = Field(default="gpt-4o")
 
     @property
     def database_url(self) -> str:
