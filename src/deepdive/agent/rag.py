@@ -5,8 +5,6 @@ RAG agent core: embedding and LLM completion helpers.
 routes to avoid duplication.
 """
 
-import asyncio
-from typing import Protocol
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 from deepdive.db import repository
@@ -17,28 +15,35 @@ from deepdive.agent.embedders import get_embedder
 _llm_client = httpx.AsyncClient(base_url=settings.llm_api_base)
 
 
+async def embed_text(text: str) -> list[float]:
+    """
+    Embed a single piece of text using the configured embedder.
+
+    Shared helper for both ingestion (``create_pubmed_embedding``) and
+    query (``retrieve_context`` / ``augment_indications_query``) paths.
+    """
+    embedder = get_embedder()
+    return await embedder.embed(text)
+
+
 async def retrieve_context(query: str, db: AsyncSession, top_k: int = 5) -> str:
     """
     1. Embeds the medical intervention query using the configured embedder.
     2. Searches Postgres (`pgvector`) for nearest neighbours in PubMed abstracts.
     """
-    embedder = get_embedder()
-    query_vector = await embedder.embed(query)
-
-    # Cosine distance (<=> via pgvector) — better than L2 for semantic similarity
-    stmt = (
-        select(PubMedAbstract)
-        .order_by(PubMedAbstract.embedding.cosine_distance(query_vector))
-        .limit(top_k)
+    query_vector = await embed_text(query)
+    matches = await repository.cosine_similarity_search(
+        db=db,
+        query_vector=query_vector,
+        top_k=top_k,
     )
-    result = await db.execute(stmt)
-    abstracts = result.scalars().all()
 
-    if not abstracts:
+    if not matches:
         return ""
 
     context_chunks = [
-        f"PMID: {a.pmid}\nTitle: {a.title}\nAbstract: {a.content}" for a in abstracts
+        f"PMID: {m['pmid']}\nTitle: {m['title']}\nAbstract: {m['content']}"
+        for m in matches
     ]
     return "\n\n---\n\n".join(context_chunks)
 
@@ -75,7 +80,7 @@ async def analyze_contraindications(intervention: str, context: str) -> str:
         response = await _llm_client.post(
             "/chat/completions",
             json={
-                "model": settings.llm_model,  # configurable via env
+                "model": settings.llm_model,
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.2,
             },

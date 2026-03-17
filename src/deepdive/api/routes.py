@@ -19,6 +19,32 @@ from deepdive.agent.rag import embed_text, retrieve_context, analyze_contraindic
 router = APIRouter()
 
 
+# ---------------------------------------------------------------------------
+# Shared Pydantic schemas
+# ---------------------------------------------------------------------------
+
+
+class PubMedEmbeddingRequest(BaseModel):
+    """Request body for ingesting a PubMed abstract."""
+    pmid: str
+    title: str
+    abstract: str
+
+
+class PubMedEmbeddingResponse(BaseModel):
+    """Success response after storing an embedding."""
+    message: str
+    pmid: str
+
+
+class IndicationMatch(BaseModel):
+    """A single cosine-similarity match returned by the query endpoint."""
+    pmid: str
+    title: str
+    content: str
+    similarity_score: float
+
+
 class RAGRequest(BaseModel):
     intervention: str
 
@@ -26,6 +52,7 @@ class RAGRequest(BaseModel):
 class RAGResponse(BaseModel):
     intervention: str
     analysis: str
+
 
 
 # ---------------------------------------------------------------------------
