@@ -7,6 +7,7 @@ from deepdive.core.config import settings
 # This would ideally be injected or instanced as a lifecycle singleton
 _http_client = httpx.AsyncClient(base_url=settings.llm_api_base)
 
+
 async def _embed_query(query: str) -> list[float]:
     """
     Calls the external embedding model API to vectorize the user's query.
@@ -14,8 +15,7 @@ async def _embed_query(query: str) -> list[float]:
     """
     try:
         response = await _http_client.post(
-            "/embeddings", 
-            json={"input": query, "model": "text-embedding-3-small"}
+            "/embeddings", json={"input": query, "model": "text-embedding-3-small"}
         )
         response.raise_for_status()
         data = response.json()
@@ -24,13 +24,14 @@ async def _embed_query(query: str) -> list[float]:
         # Fallback or strict error handling here
         raise RuntimeError(f"Failed to generate embeddings: {e}")
 
+
 async def retrieve_context(query: str, db: AsyncSession, top_k: int = 5) -> str:
     """
     1. Embeds the medical intervention query.
     2. Searches Postgres (`pgvector`) for nearest neighbors in PubMed abstracts.
     """
     query_vector = await _embed_query(query)
-    
+
     # L2 distance (<->) via pgvector
     stmt = (
         select(PubMedAbstract)
@@ -39,15 +40,15 @@ async def retrieve_context(query: str, db: AsyncSession, top_k: int = 5) -> str:
     )
     result = await db.execute(stmt)
     abstracts = result.scalars().all()
-    
+
     if not abstracts:
         return ""
-    
+
     context_chunks = [
-        f"PMID: {a.pmid}\nTitle: {a.title}\nAbstract: {a.content}"
-        for a in abstracts
+        f"PMID: {a.pmid}\nTitle: {a.title}\nAbstract: {a.content}" for a in abstracts
     ]
     return "\n\n---\n\n".join(context_chunks)
+
 
 async def analyze_contraindications(intervention: str, context: str) -> str:
     """
@@ -72,8 +73,8 @@ async def analyze_contraindications(intervention: str, context: str) -> str:
             json={
                 "model": "gpt-4o",  # or claude-3, llama-3 based on what's running locally
                 "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.2
-            }
+                "temperature": 0.2,
+            },
         )
         response.raise_for_status()
         data = response.json()

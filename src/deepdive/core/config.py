@@ -1,13 +1,15 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
+
 class Settings(BaseSettings):
     """
     Application Settings Configured via Environment Variables.
     """
+
     project_name: str = "DeepDive RAG Agent"
     version: str = "0.1.0"
-    
+
     # Postgres pgvector Settings
     postgres_user: str = Field(default="postgres")
     postgres_password: str = Field(default="postgres")
@@ -27,5 +29,6 @@ class Settings(BaseSettings):
         return f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+
 
 settings = Settings()
