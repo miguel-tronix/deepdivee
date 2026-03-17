@@ -10,11 +10,14 @@ dependencies = [
     "htt>=0.35",
     "httpx>=0.28.1",
     "pgvector>=0.4.2",
+    "pip>=26.0.1",
     "psycopg2-binary>=2.9.11",
     "pydantic>=2.12.5",
     "pydantic-settings>=2.13.1",
+    "pytest>=9.0.2",
     "redis>=7.2.0",
-    "sentence-transformers>=5.2.3",
+    "ruff>=0.15.6",
+    "sentence-transformers>=3.0.0",
     "sqlalchemy>=2.0.46",
     "uvicorn[standard]>=0.41.0",
 ]
@@ -28,4 +31,4 @@ dev = [
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
-asyncio_mode = "auto"
+asyncio_mode = "strict"

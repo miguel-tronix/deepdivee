@@ -1,3 +1,4 @@
+from typing import Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
@@ -30,6 +31,13 @@ class Settings(BaseSettings):
     embedding_device: str = Field(default="auto")  # "auto", "cpu", "cuda"
     embedding_batch_size: int = Field(default=32)
     embedding_trust_remote_code: bool = Field(default=False)
+
+    # Embedding settings
+    embedding_backend: Literal["local", "openai"] = Field(default="local")
+    embedding_model: str = Field(default="all-MiniLM-L6-v2")
+
+    # LLM completion settings
+    llm_model: str = Field(default="gpt-4o")
 
     @property
     def database_url(self) -> str:

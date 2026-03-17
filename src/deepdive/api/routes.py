@@ -7,6 +7,7 @@ POST /api/embeddings          create_pubmed_embedding
 GET  /api/indications         augment_indications_query
 POST /api/contraindications   get_contraindications  (existing)
 """
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,31 +17,6 @@ from deepdive.db import repository
 from deepdive.agent.rag import embed_text, retrieve_context, analyze_contraindications
 
 router = APIRouter()
-
-
-# ---------------------------------------------------------------------------
-# Shared Pydantic schemas
-# ---------------------------------------------------------------------------
-
-class PubMedEmbeddingRequest(BaseModel):
-    """Request body for ingesting a PubMed abstract."""
-    pmid: str
-    title: str
-    abstract: str
-
-
-class PubMedEmbeddingResponse(BaseModel):
-    """Success response after storing an embedding."""
-    message: str
-    pmid: str
-
-
-class IndicationMatch(BaseModel):
-    """A single cosine-similarity match returned by the query endpoint."""
-    pmid: str
-    title: str
-    content: str
-    similarity_score: float
 
 
 class RAGRequest(BaseModel):
@@ -55,6 +31,7 @@ class RAGResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # POST /embeddings — ingest a PubMed abstract
 # ---------------------------------------------------------------------------
+
 
 @router.post("/embeddings", response_model=PubMedEmbeddingResponse, status_code=200)
 async def create_pubmed_embedding(
@@ -89,6 +66,7 @@ async def create_pubmed_embedding(
 # GET /indications — semantic search over stored abstracts
 # ---------------------------------------------------------------------------
 
+
 @router.get("/indications", response_model=list[IndicationMatch])
 async def augment_indications_query(
     question: str = Query(
@@ -122,10 +100,10 @@ async def augment_indications_query(
 # POST /contraindications — existing RAG + LLM synthesis endpoint
 # ---------------------------------------------------------------------------
 
+
 @router.post("/contraindications", response_model=RAGResponse)
 async def get_contraindications(
-    request: RAGRequest,
-    db: AsyncSession = Depends(get_db),
+    request: RAGRequest, db: AsyncSession = Depends(get_db)
 ):
     """
     RAG endpoint for contra-indication synthesis.
@@ -134,6 +112,9 @@ async def get_contraindications(
     pgvector cosine similarity and synthesises an analysis using the LLM.
     """
     intervention = request.intervention
+
+    # Needs to be hooked up to Redis caching
+    # e.g., cached_response = await redis.get(intervention)
 
     try:
         context = await retrieve_context(intervention, db)
@@ -144,6 +125,9 @@ async def get_contraindications(
             )
 
         analysis = await analyze_contraindications(intervention, context)
+
+        # e.g., await redis.set(intervention, analysis, ex=3600)
+
         return RAGResponse(intervention=intervention, analysis=analysis)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
