@@ -4,6 +4,7 @@ from deepdive.api.routes import router as api_router
 from deepdive.core.config import settings
 from deepdive.agent.embedders import initialise_embedder
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Load the embedding model once at startup so it's warm for all requests."""

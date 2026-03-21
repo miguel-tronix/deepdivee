@@ -4,6 +4,7 @@ Shared fixtures for the DeepDive test suite.
 Provides reusable async client, mock embedder, and embedding helpers
 to reduce duplication and improve test consistency.
 """
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 from unittest.mock import AsyncMock, MagicMock
@@ -21,6 +22,7 @@ FAKE_VECTOR = [0.1] * EMBEDDING_DIM
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 async def async_client():
@@ -40,16 +42,20 @@ def fake_vector():
 @pytest.fixture
 def mock_embed_text_success():
     """An async mock for embed_text that returns a valid 768-dim vector."""
+
     async def _mock(text: str):
         return FAKE_VECTOR
+
     return _mock
 
 
 @pytest.fixture
 def mock_embed_text_failure():
     """An async mock for embed_text that raises RuntimeError."""
+
     async def _mock(text: str):
         raise RuntimeError("Embedding service unavailable")
+
     return _mock
 
 

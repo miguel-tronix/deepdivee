@@ -4,6 +4,7 @@ Database repository for PubMed abstract embeddings.
 Provides async helpers for inserting new embeddings and querying
 the pgvector store using cosine similarity.
 """
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from deepdive.db.models import PubMedAbstract

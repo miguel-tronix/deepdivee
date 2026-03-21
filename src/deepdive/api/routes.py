@@ -26,6 +26,7 @@ router = APIRouter()
 
 class PubMedEmbeddingRequest(BaseModel):
     """Request body for ingesting a PubMed abstract."""
+
     pmid: str
     title: str
     abstract: str
@@ -33,12 +34,14 @@ class PubMedEmbeddingRequest(BaseModel):
 
 class PubMedEmbeddingResponse(BaseModel):
     """Success response after storing an embedding."""
+
     message: str
     pmid: str
 
 
 class IndicationMatch(BaseModel):
     """A single cosine-similarity match returned by the query endpoint."""
+
     pmid: str
     title: str
     content: str
@@ -52,7 +55,6 @@ class RAGRequest(BaseModel):
 class RAGResponse(BaseModel):
     intervention: str
     analysis: str
-
 
 
 # ---------------------------------------------------------------------------
