@@ -17,7 +17,6 @@ import httpx
 
 from deepdive.core.config import settings
 
-
 # ---------------------------------------------------------------------------
 # Protocol
 # ---------------------------------------------------------------------------
@@ -54,7 +53,7 @@ class LocalEmbedder:
 
     async def embed(self, text: str) -> list[float]:
         loop = asyncio.get_running_loop()
-        vector = await loop.run_in_executor(
+        vector: list[float] = await loop.run_in_executor(
             None,  # default ThreadPoolExecutor
             lambda: self._model.encode(text, convert_to_numpy=True).tolist(),
         )
