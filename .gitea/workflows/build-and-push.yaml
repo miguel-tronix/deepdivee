@@ -1,0 +1,50 @@
+name: Build and Push API Container
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+
+env:
+  # Using Gitea's built-in container registry at your cluster URL
+  REGISTRY: gitea-http.code.svc.cluster.local:3000 # <-- update this to your actual Gitea URL if different for Docker pushing
+  IMAGE_NAME: ${{ gitea.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest # Your act_runner needs to advertise this label
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ gitea.actor }}
+          password: ${{ secrets.GITEA_TOKEN }} # Built in secret if Actions is enabled for packages
+
+      - name: Extract Docker metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,format=short
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          
+      # NOTE: In a true GitOps workflow, the final step here would be to:
+      # 1. Checkout your separate deployment-manifests repository
+      # 2. Use `sed` or yq to update the Deployment YAML with the new SHA tag: ${{ steps.meta.outputs.version }}
+      # 3. Commit and push that change back to Gitea so ArgoCD detects it.

@@ -7,7 +7,7 @@ Tests for the embedding abstraction layer.
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 
 # ---------------------------------------------------------------------------
@@ -100,7 +100,9 @@ def test_get_embedder_openai(monkeypatch):
 
     monkeypatch.setattr(emb_module, "_embedder", None)
     monkeypatch.setattr(emb_module.settings, "embedding_backend", "openai")
-    monkeypatch.setattr(emb_module.settings, "embedding_model", "text-embedding-3-small")
+    monkeypatch.setattr(
+        emb_module.settings, "embedding_model", "text-embedding-3-small"
+    )
 
     embedder = emb_module.initialise_embedder()
     assert isinstance(embedder, OpenAIEmbedder)

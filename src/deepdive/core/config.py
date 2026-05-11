@@ -23,7 +23,14 @@ class Settings(BaseSettings):
 
     # External LLM / Ingestion API
     llm_api_base: str = Field(default="http://localhost:8000/v1")
+    embedding_model: str = Field(default="nomic-embed-text")  # 768-dim
     llm_api_key: str = Field(default="dummy")
+    use_local_embeddings: bool = Field(default=False)
+
+    # Local Embedding Settings
+    embedding_device: str = Field(default="auto")  # "auto", "cpu", "cuda"
+    embedding_batch_size: int = Field(default=32)
+    embedding_trust_remote_code: bool = Field(default=False)
 
     # Embedding settings
     embedding_backend: Literal["local", "openai"] = Field(default="local")
