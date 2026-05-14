@@ -21,11 +21,12 @@ class Settings(BaseSettings):
     # Redis Settings
     redis_url: str = Field(default="redis://localhost:6379/0")
 
+    # any-llm provider (maps to any_llm.LLMProvider)
+    llm_provider: str = Field(default="openai")
+
     # External LLM / Ingestion API
     llm_api_base: str = Field(default="http://localhost:8000/v1")
-    embedding_model: str = Field(default="nomic-embed-text")  # 768-dim
     llm_api_key: str = Field(default="dummy")
-    use_local_embeddings: bool = Field(default=False)
 
     # Local Embedding Settings
     embedding_device: str = Field(default="auto")  # "auto", "cpu", "cuda"

@@ -14,7 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from deepdive.db.session import get_db
 from deepdive.db import repository
-from deepdive.agent.rag import embed_text, retrieve_context, analyze_contraindications
+from deepdive.agent.rag import embed_text, retrieve_context
+from deepdive.agent.memory import memory_store
+from deepdive.agent.agent import analyze_with_agent
 
 router = APIRouter()
 
@@ -139,11 +141,13 @@ async def get_contraindications(
 
     Given a medical intervention, retrieves the closest PubMed abstracts via
     pgvector cosine similarity and synthesises an analysis using the LLM.
+    Results are cached in Redis (TTL 1 hour) to avoid redundant LLM calls.
     """
     intervention = request.intervention
 
-    # Needs to be hooked up to Redis caching
-    # e.g., cached_response = await redis.get(intervention)
+    cached = await memory_store.get_cached_analysis(intervention)
+    if cached is not None:
+        return RAGResponse(intervention=intervention, analysis=cached)
 
     try:
         context = await retrieve_context(intervention, db)
@@ -153,9 +157,9 @@ async def get_contraindications(
                 analysis="No specific PubMed context found for this intervention's contra-indications.",
             )
 
-        analysis = await analyze_contraindications(intervention, context)
+        analysis = await analyze_with_agent(intervention, context)
 
-        # e.g., await redis.set(intervention, analysis, ex=3600)
+        await memory_store.cache_analysis(intervention, analysis)
 
         return RAGResponse(intervention=intervention, analysis=analysis)
     except Exception as e:

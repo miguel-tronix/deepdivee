@@ -3,13 +3,18 @@ from fastapi import FastAPI
 from deepdive.api.routes import router as api_router
 from deepdive.core.config import settings
 from deepdive.agent.embedders import initialise_embedder
+from deepdive.agent.memory import memory_store
+from deepdive.agent.agent import cleanup_agent
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Load the embedding model once at startup so it's warm for all requests."""
+    """Initialise embedder + Redis-backed memory at startup."""
     initialise_embedder()
+    await memory_store.initialize()
     yield
+    await memory_store.close()
+    await cleanup_agent()
 
 
 app = FastAPI(

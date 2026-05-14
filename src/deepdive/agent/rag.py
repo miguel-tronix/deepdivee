@@ -5,32 +5,32 @@ RAG agent core: embedding and LLM completion helpers.
 routes to avoid duplication.
 """
 
-import httpx
+from any_llm import AnyLLM
 from sqlalchemy.ext.asyncio import AsyncSession
 from deepdive.db import repository
 from deepdive.core.config import settings
 from deepdive.agent.embedders import get_embedder
 
-# Dedicated HTTP client for LLM completion calls only
-_llm_client = httpx.AsyncClient(base_url=settings.llm_api_base)
+_llm: AnyLLM | None = None
+
+
+def get_llm() -> AnyLLM:
+    global _llm
+    if _llm is None:
+        _llm = AnyLLM.create(
+            settings.llm_provider,
+            api_key=settings.llm_api_key,
+            api_base=settings.llm_api_base,
+        )
+    return _llm
 
 
 async def embed_text(text: str) -> list[float]:
-    """
-    Embed a single piece of text using the configured embedder.
-
-    Shared helper for both ingestion (``create_pubmed_embedding``) and
-    query (``retrieve_context`` / ``augment_indications_query``) paths.
-    """
     embedder = get_embedder()
     return await embedder.embed(text)
 
 
 async def retrieve_context(query: str, db: AsyncSession, top_k: int = 5) -> str:
-    """
-    1. Embeds the medical intervention query using the configured embedder.
-    2. Searches Postgres (`pgvector`) for nearest neighbours in PubMed abstracts.
-    """
     query_vector = await embed_text(query)
     matches = await repository.cosine_similarity_search(
         db=db,
@@ -49,20 +49,6 @@ async def retrieve_context(query: str, db: AsyncSession, top_k: int = 5) -> str:
 
 
 async def analyze_contraindications(intervention: str, context: str) -> str:
-    """
-    Call the LLM to produce a contra-indication analysis grounded in retrieved
-    PubMed context.
-
-    Args:
-        intervention: The medical intervention being queried.
-        context: Formatted PubMed context string from ``retrieve_context``.
-
-    Returns:
-        LLM-generated analysis string.
-
-    Raises:
-        RuntimeError: If the LLM API call fails.
-    """
     prompt = f"""
     You are an expert medical AI specialising in identifying contra-indications.
     Based strictly on the provided PubMed literature context, analyse the following
@@ -76,18 +62,13 @@ async def analyze_contraindications(intervention: str, context: str) -> str:
     Response format: Provide a concise summary followed by bullet points of
     contra-indications.
     """
+    llm = get_llm()
     try:
-        response = await _llm_client.post(
-            "/chat/completions",
-            json={
-                "model": settings.llm_model,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.2,
-            },
-            headers={"Authorization": f"Bearer {settings.llm_api_key}"},
+        response = await llm.acompletion(
+            model=settings.llm_model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
         )
-        response.raise_for_status()
-        data = response.json()
-        return data["choices"][0]["message"]["content"]
+        return response.choices[0].message.content
     except Exception as e:
         raise RuntimeError(f"LLM request failed: {e}") from e
