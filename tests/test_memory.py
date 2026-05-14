@@ -1,7 +1,7 @@
 import json
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, PropertyMock
+from unittest.mock import AsyncMock, MagicMock
 
 pytestmark = pytest.mark.asyncio
 
@@ -32,7 +32,6 @@ async def test_initialize_creates_client_and_checkpointer(monkeypatch):
 
     monkeypatch.setattr(mem_module.aioredis, "from_url", lambda url, decode_responses: fake_client)
 
-    mock_redis_saver = MagicMock()
     monkeypatch.setattr(mem_module, "RedisSaver", lambda async_client: fake_checkpointer)
 
     await mem.initialize()

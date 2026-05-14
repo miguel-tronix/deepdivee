@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     embedding_backend: Literal["local", "openai"] = Field(default="local")
     embedding_model: str = Field(default="all-MiniLM-L6-v2")
 
+    # Embedding dimension (must match the model in use)
+    # all-MiniLM-L6-v2 → 384
+    embedding_dimension: int = Field(default=384)
+
     # LLM completion settings
     llm_model: str = Field(default="gpt-4o")
 

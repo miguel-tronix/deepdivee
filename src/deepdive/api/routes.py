@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from deepdive.db.session import get_db
 from deepdive.db import repository
-from deepdive.agent.rag import embed_text, retrieve_context
+from deepdive.agent.rag import embed_text
 from deepdive.agent.memory import memory_store
 from deepdive.agent.agent import analyze_with_agent
 
@@ -133,14 +133,13 @@ async def augment_indications_query(
 
 
 @router.post("/contraindications", response_model=RAGResponse)
-async def get_contraindications(
-    request: RAGRequest, db: AsyncSession = Depends(get_db)
-):
+async def get_contraindications(request: RAGRequest):
     """
     RAG endpoint for contra-indication synthesis.
 
-    Given a medical intervention, retrieves the closest PubMed abstracts via
-    pgvector cosine similarity and synthesises an analysis using the LLM.
+    Given a medical intervention, the agent generates a precise search query,
+    retrieves relevant PubMed abstracts via pgvector cosine similarity, and
+    synthesises an analysis using the LLM — all in a multi-step ReAct loop.
     Results are cached in Redis (TTL 1 hour) to avoid redundant LLM calls.
     """
     intervention = request.intervention
@@ -150,14 +149,7 @@ async def get_contraindications(
         return RAGResponse(intervention=intervention, analysis=cached)
 
     try:
-        context = await retrieve_context(intervention, db)
-        if not context:
-            return RAGResponse(
-                intervention=intervention,
-                analysis="No specific PubMed context found for this intervention's contra-indications.",
-            )
-
-        analysis = await analyze_with_agent(intervention, context)
+        analysis = await analyze_with_agent(intervention)
 
         await memory_store.cache_analysis(intervention, analysis)
 

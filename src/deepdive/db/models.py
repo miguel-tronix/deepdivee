@@ -2,6 +2,8 @@ from sqlalchemy.orm import declarative_base, Mapped, mapped_column
 from sqlalchemy import Text, Integer, String
 from pgvector.sqlalchemy import Vector
 
+from deepdive.core.config import settings
+
 Base = declarative_base()
 
 
@@ -18,6 +20,6 @@ class PubMedAbstract(Base):
     title: Mapped[str] = mapped_column(Text)
     content: Mapped[str] = mapped_column(Text)
 
-    # 768 is a common embedding dimension (e.g. for some BERT/nomic models),
-    # adjust as needed based on the LLM ingestion pipeline.
-    embedding: Mapped[Vector] = mapped_column(Vector(768))
+    embedding: Mapped[Vector] = mapped_column(
+        Vector(settings.embedding_dimension)
+    )

@@ -14,6 +14,9 @@ async def test_get_agent_creates_and_caches(monkeypatch):
     create_mock = AsyncMock(return_value=fake_agent)
     monkeypatch.setattr(agent_module.AnyAgent, "create_async", create_mock)
 
+    monkeypatch.setattr(agent_module.memory_store, "initialize", AsyncMock())
+    monkeypatch.setattr(agent_module.memory_store, "checkpointer", MagicMock())
+
     result1 = await agent_module.get_agent()
     assert result1 is fake_agent
     create_mock.assert_awaited_once()
@@ -35,9 +38,7 @@ async def test_analyze_with_agent_runs_agent_and_stores_history(monkeypatch):
     fake_memory = AsyncMock()
     monkeypatch.setattr(agent_module, "memory_store", fake_memory)
 
-    result = await agent_module.analyze_with_agent(
-        "aspirin", "PubMed context about aspirin"
-    )
+    result = await agent_module.analyze_with_agent("aspirin")
 
     assert result == "Contraindications: bleeding risk"
     fake_agent.run_async.assert_awaited_once()
@@ -45,12 +46,12 @@ async def test_analyze_with_agent_runs_agent_and_stores_history(monkeypatch):
 
     assert fake_memory.add_to_history.await_count == 2
     fake_memory.add_to_history.assert_any_await(
-        session_id="contraindications",
+        session_id="intervention:aspirin",
         role="user",
         content="Analyse contra-indications for: aspirin",
     )
     fake_memory.add_to_history.assert_any_await(
-        session_id="contraindications",
+        session_id="intervention:aspirin",
         role="assistant",
         content="Contraindications: bleeding risk",
     )
@@ -83,6 +84,9 @@ async def test_get_agent_passes_correct_config(monkeypatch):
 
     monkeypatch.setattr(agent_module, "_agent", None)
 
+    monkeypatch.setattr(agent_module.memory_store, "initialize", AsyncMock())
+    monkeypatch.setattr(agent_module.memory_store, "checkpointer", MagicMock())
+
     fake_agent = AsyncMock()
     captured_config = {}
 
@@ -90,6 +94,8 @@ async def test_get_agent_passes_correct_config(monkeypatch):
         captured_config["framework"] = framework
         captured_config["model_id"] = config.model_id
         captured_config["instructions"] = config.instructions
+        captured_config["tools"] = config.tools
+        captured_config["agent_args"] = config.agent_args
         return fake_agent
 
     monkeypatch.setattr(agent_module.AnyAgent, "create_async", fake_create)
@@ -98,4 +104,10 @@ async def test_get_agent_passes_correct_config(monkeypatch):
 
     assert captured_config["framework"] == "langchain"
     assert "openai" in captured_config["model_id"]
-    assert "contra-indications" in captured_config["instructions"]
+    assert "search query" in captured_config["instructions"]
+    assert "retrieve_pubmed_context" in captured_config["instructions"]
+    assert len(captured_config["tools"]) == 1
+    assert captured_config["tools"][0] is agent_module.retrieve_pubmed_context
+    assert captured_config["agent_args"] == {
+        "checkpointer": agent_module.memory_store.checkpointer
+    }

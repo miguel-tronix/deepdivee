@@ -5,24 +5,9 @@ RAG agent core: embedding and LLM completion helpers.
 routes to avoid duplication.
 """
 
-from any_llm import AnyLLM
 from sqlalchemy.ext.asyncio import AsyncSession
 from deepdive.db import repository
-from deepdive.core.config import settings
 from deepdive.agent.embedders import get_embedder
-
-_llm: AnyLLM | None = None
-
-
-def get_llm() -> AnyLLM:
-    global _llm
-    if _llm is None:
-        _llm = AnyLLM.create(
-            settings.llm_provider,
-            api_key=settings.llm_api_key,
-            api_base=settings.llm_api_base,
-        )
-    return _llm
 
 
 async def embed_text(text: str) -> list[float]:
@@ -48,27 +33,26 @@ async def retrieve_context(query: str, db: AsyncSession, top_k: int = 5) -> str:
     return "\n\n---\n\n".join(context_chunks)
 
 
-async def analyze_contraindications(intervention: str, context: str) -> str:
-    prompt = f"""
-    You are an expert medical AI specialising in identifying contra-indications.
-    Based strictly on the provided PubMed literature context, analyse the following
-    intervention and list its major contra-indications.
+async def retrieve_pubmed_context(search_query: str) -> str:
+    """Search PubMed abstracts via vector similarity and return relevant context.
 
-    Intervention: {intervention}
+    Use this tool to retrieve medical literature context about a specific
+    intervention, drug, or condition. Performs a semantic search over stored
+    PubMed abstracts and returns the most relevant results.
 
-    Context:
-    {context}
+    Args:
+        search_query: A detailed search query describing the medical intervention,
+                     drug, or condition to look up.
 
-    Response format: Provide a concise summary followed by bullet points of
-    contra-indications.
+    Returns:
+        Formatted context with PMIDs, titles, and abstracts, or a message
+        indicating no relevant literature was found.
     """
-    llm = get_llm()
-    try:
-        response = await llm.acompletion(
-            model=settings.llm_model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        raise RuntimeError(f"LLM request failed: {e}") from e
+    from deepdive.db.session import AsyncSessionLocal
+
+    async with AsyncSessionLocal() as db:
+        result = await retrieve_context(search_query, db, top_k=5)
+    return result or "No relevant PubMed literature found for this query."
+
+
+
