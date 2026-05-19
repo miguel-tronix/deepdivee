@@ -11,6 +11,7 @@ Use `get_embedder()` to get the singleton instance configured via settings.
 from __future__ import annotations
 
 import asyncio
+import threading
 from typing import Protocol, runtime_checkable
 
 import httpx
@@ -95,6 +96,7 @@ class OpenAIEmbedder:
 # Module-level singleton — populated by get_embedder() on first call or
 # explicitly at app startup via initialise_embedder().
 _embedder: Embedder | None = None
+_embedder_lock = threading.Lock()
 
 
 def initialise_embedder() -> Embedder:
@@ -107,21 +109,25 @@ def initialise_embedder() -> Embedder:
     if _embedder is not None:
         return _embedder
 
-    backend = settings.embedding_backend
-    model = settings.embedding_model
+    with _embedder_lock:
+        if _embedder is not None:
+            return _embedder
 
-    if backend == "local":
-        _embedder = LocalEmbedder(model_name=model)
-    elif backend == "openai":
-        _http_client = httpx.AsyncClient(
-            base_url=settings.llm_api_base,
-            timeout=30.0,
-        )
-        _embedder = OpenAIEmbedder(client=_http_client, model=model)
-    else:
-        raise ValueError(f"Unknown embedding backend: {backend!r}")
+        backend = settings.embedding_backend
+        model = settings.embedding_model
 
-    return _embedder
+        if backend == "local":
+            _embedder = LocalEmbedder(model_name=model)
+        elif backend == "openai":
+            _http_client = httpx.AsyncClient(
+                base_url=settings.llm_api_base,
+                timeout=30.0,
+            )
+            _embedder = OpenAIEmbedder(client=_http_client, model=model)
+        else:
+            raise ValueError(f"Unknown embedding backend: {backend!r}")
+
+        return _embedder
 
 
 def get_embedder() -> Embedder:

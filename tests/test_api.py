@@ -1,5 +1,6 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
+from unittest.mock import AsyncMock
 from deepdive.main import app
 
 
@@ -16,22 +17,24 @@ async def test_health_check():
 @pytest.mark.asyncio
 async def test_contraindications_endpoint_mocked(monkeypatch):
     """
-    Test the endpoint with mocked RAG logic to avoid hitting the actual DB/LLM
+    Test the endpoint with mocked agent logic to avoid hitting the actual DB/LLM
     during basic API unit testing.
     """
 
-    async def mock_retrieve_context(*args, **kwargs):
-        return "Mocked PubMed Abstract Context"
-
-    async def mock_analyze_contraindications(*args, **kwargs):
+    async def mock_analyze_with_agent(intervention: str) -> str:
         return "Mocked Contraindication Analysis"
 
     # Patch the agent logic
     import deepdive.api.routes
 
-    monkeypatch.setattr(deepdive.api.routes, "retrieve_context", mock_retrieve_context)
     monkeypatch.setattr(
-        deepdive.api.routes, "analyze_contraindications", mock_analyze_contraindications
+        deepdive.api.routes, "analyze_with_agent", mock_analyze_with_agent
+    )
+    monkeypatch.setattr(
+        deepdive.api.routes.memory_store, "get_cached_analysis", AsyncMock(return_value=None)
+    )
+    monkeypatch.setattr(
+        deepdive.api.routes.memory_store, "cache_analysis", AsyncMock()
     )
 
     async with AsyncClient(

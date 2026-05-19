@@ -21,11 +21,12 @@ class Settings(BaseSettings):
     # Redis Settings
     redis_url: str = Field(default="redis://localhost:6379/0")
 
+    # any-llm provider (maps to any_llm.LLMProvider)
+    llm_provider: str = Field(default="openai")
+
     # External LLM / Ingestion API
     llm_api_base: str = Field(default="http://localhost:8000/v1")
-    embedding_model: str = Field(default="nomic-embed-text")  # 768-dim
     llm_api_key: str = Field(default="dummy")
-    use_local_embeddings: bool = Field(default=False)
 
     # Local Embedding Settings
     embedding_device: str = Field(default="auto")  # "auto", "cpu", "cuda"
@@ -35,6 +36,10 @@ class Settings(BaseSettings):
     # Embedding settings
     embedding_backend: Literal["local", "openai"] = Field(default="local")
     embedding_model: str = Field(default="all-MiniLM-L6-v2")
+
+    # Embedding dimension (must match the model in use)
+    # all-MiniLM-L6-v2 → 384
+    embedding_dimension: int = Field(default=384)
 
     # LLM completion settings
     llm_model: str = Field(default="gpt-4o")
