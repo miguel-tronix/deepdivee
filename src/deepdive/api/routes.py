@@ -5,58 +5,30 @@ Routes
 ------
 POST /api/embeddings          create_pubmed_embedding
 GET  /api/indications         augment_indications_query
-POST /api/contraindications   get_contraindications  (existing)
+POST /api/contraindications   get_contraindications
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from deepdive.api.schemas import (
+    IndicationMatch,
+    PubMedEmbeddingRequest,
+    PubMedEmbeddingResponse,
+    RAGRequest,
+    RAGResponse,
+)
+from deepdive.api.services import (
+    ContraindicationService,
+    EmbeddingService,
+    IndicationService,
+    get_contraindication_service,
+    get_embedding_service,
+    get_indication_service,
+)
 from deepdive.db.session import get_db
-from deepdive.db import repository
-from deepdive.agent.rag import embed_text
-from deepdive.agent.memory import memory_store
-from deepdive.agent.agent import analyze_with_agent
 
 router = APIRouter()
-
-
-# ---------------------------------------------------------------------------
-# Shared Pydantic schemas
-# ---------------------------------------------------------------------------
-
-
-class PubMedEmbeddingRequest(BaseModel):
-    """Request body for ingesting a PubMed abstract."""
-
-    pmid: str
-    title: str
-    abstract: str
-
-
-class PubMedEmbeddingResponse(BaseModel):
-    """Success response after storing an embedding."""
-
-    message: str
-    pmid: str
-
-
-class IndicationMatch(BaseModel):
-    """A single cosine-similarity match returned by the query endpoint."""
-
-    pmid: str
-    title: str
-    content: str
-    similarity_score: float
-
-
-class RAGRequest(BaseModel):
-    intervention: str
-
-
-class RAGResponse(BaseModel):
-    intervention: str
-    analysis: str
 
 
 # ---------------------------------------------------------------------------
@@ -68,6 +40,7 @@ class RAGResponse(BaseModel):
 async def create_pubmed_embedding(
     request: PubMedEmbeddingRequest,
     db: AsyncSession = Depends(get_db),
+    service: EmbeddingService = Depends(get_embedding_service),
 ):
     """
     Ingest a PubMed abstract by creating its vector embedding and persisting
@@ -77,20 +50,7 @@ async def create_pubmed_embedding(
     - **title**: Title of the abstract
     - **abstract**: Full abstract text to embed and store
     """
-    try:
-        vector = await embed_text(request.abstract)
-        await repository.insert_pubmed_embedding(
-            db=db,
-            pmid=request.pmid,
-            title=request.title,
-            content=request.abstract,
-            embedding=vector,
-        )
-        return PubMedEmbeddingResponse(message="ok", pmid=request.pmid)
-    except RuntimeError as e:
-        raise HTTPException(status_code=502, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return await service.create_embedding(request, db)
 
 
 # ---------------------------------------------------------------------------
@@ -106,6 +66,7 @@ async def augment_indications_query(
         min_length=3,
     ),
     db: AsyncSession = Depends(get_db),
+    service: IndicationService = Depends(get_indication_service),
 ):
     """
     Embed the given question and return the top-10 PubMed abstracts ranked by
@@ -113,18 +74,7 @@ async def augment_indications_query(
 
     - **question**: Free-text query (e.g. ``"contraindications of aspirin in pregnancy"``)
     """
-    try:
-        query_vector = await embed_text(question)
-        matches = await repository.cosine_similarity_search(
-            db=db,
-            query_vector=query_vector,
-            top_k=10,
-        )
-        return [IndicationMatch(**m) for m in matches]
-    except RuntimeError as e:
-        raise HTTPException(status_code=502, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return await service.search(question, db)
 
 
 # ---------------------------------------------------------------------------
@@ -133,7 +83,10 @@ async def augment_indications_query(
 
 
 @router.post("/contraindications", response_model=RAGResponse)
-async def get_contraindications(request: RAGRequest):
+async def get_contraindications(
+    request: RAGRequest,
+    service: ContraindicationService = Depends(get_contraindication_service),
+):
     """
     RAG endpoint for contra-indication synthesis.
 
@@ -142,17 +95,4 @@ async def get_contraindications(request: RAGRequest):
     synthesises an analysis using the LLM — all in a multi-step ReAct loop.
     Results are cached in Redis (TTL 1 hour) to avoid redundant LLM calls.
     """
-    intervention = request.intervention
-
-    cached = await memory_store.get_cached_analysis(intervention)
-    if cached is not None:
-        return RAGResponse(intervention=intervention, analysis=cached)
-
-    try:
-        analysis = await analyze_with_agent(intervention)
-
-        await memory_store.cache_analysis(intervention, analysis)
-
-        return RAGResponse(intervention=intervention, analysis=analysis)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return await service.analyze(request)

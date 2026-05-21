@@ -17,24 +17,23 @@ async def test_health_check():
 @pytest.mark.asyncio
 async def test_contraindications_endpoint_mocked(monkeypatch):
     """
-    Test the endpoint with mocked agent logic to avoid hitting the actual DB/LLM
-    during basic API unit testing.
+    Test the endpoint with mocked service dependencies to avoid hitting
+    the actual DB/LLM during basic API unit testing.
     """
 
     async def mock_analyze_with_agent(intervention: str) -> str:
         return "Mocked Contraindication Analysis"
 
-    # Patch the agent logic
-    import deepdive.api.routes
+    import deepdive.api.services as svc_module
 
+    monkeypatch.setattr(svc_module, "analyze_with_agent", mock_analyze_with_agent)
     monkeypatch.setattr(
-        deepdive.api.routes, "analyze_with_agent", mock_analyze_with_agent
+        svc_module.memory_store,
+        "get_cached_analysis",
+        AsyncMock(return_value=None),
     )
     monkeypatch.setattr(
-        deepdive.api.routes.memory_store, "get_cached_analysis", AsyncMock(return_value=None)
-    )
-    monkeypatch.setattr(
-        deepdive.api.routes.memory_store, "cache_analysis", AsyncMock()
+        svc_module.memory_store, "cache_analysis", AsyncMock()
     )
 
     async with AsyncClient(
