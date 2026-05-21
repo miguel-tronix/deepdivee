@@ -27,7 +27,6 @@ async def test_create_pubmed_embedding_success(monkeypatch):
         return FAKE_VECTOR
 
     async def mock_insert(*, db, pmid, title, content, embedding):
-        """Mock matching the keyword-argument call convention in routes.py."""
         from deepdive.db.models import PubMedAbstract
 
         obj = PubMedAbstract(
@@ -35,10 +34,10 @@ async def test_create_pubmed_embedding_success(monkeypatch):
         )
         return obj
 
-    import deepdive.api.routes as routes_module
+    import deepdive.api.services as svc_module
     import deepdive.db.repository as repo_module
 
-    monkeypatch.setattr(routes_module, "embed_text", mock_embed_text)
+    monkeypatch.setattr(svc_module, "embed_text", mock_embed_text)
     monkeypatch.setattr(repo_module, "insert_pubmed_embedding", mock_insert)
 
     async with AsyncClient(
@@ -68,9 +67,9 @@ async def test_create_pubmed_embedding_embed_failure(monkeypatch):
     async def mock_embed_text_fail(text: str):
         raise RuntimeError("Embedding service unavailable")
 
-    import deepdive.api.routes as routes_module
+    import deepdive.api.services as svc_module
 
-    monkeypatch.setattr(routes_module, "embed_text", mock_embed_text_fail)
+    monkeypatch.setattr(svc_module, "embed_text", mock_embed_text_fail)
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
@@ -109,10 +108,10 @@ async def test_augment_indications_query_success(monkeypatch):
             for i in range(top_k)
         ]
 
-    import deepdive.api.routes as routes_module
+    import deepdive.api.services as svc_module
     import deepdive.db.repository as repo_module
 
-    monkeypatch.setattr(routes_module, "embed_text", mock_embed_text)
+    monkeypatch.setattr(svc_module, "embed_text", mock_embed_text)
     monkeypatch.setattr(repo_module, "cosine_similarity_search", mock_cosine_search)
 
     async with AsyncClient(
@@ -159,9 +158,9 @@ async def test_augment_indications_query_embed_failure(monkeypatch):
     async def mock_embed_text_fail(text: str):
         raise RuntimeError("Embedding service unavailable")
 
-    import deepdive.api.routes as routes_module
+    import deepdive.api.services as svc_module
 
-    monkeypatch.setattr(routes_module, "embed_text", mock_embed_text_fail)
+    monkeypatch.setattr(svc_module, "embed_text", mock_embed_text_fail)
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
@@ -182,15 +181,15 @@ async def test_augment_indications_query_embed_failure(monkeypatch):
 async def test_create_pubmed_embedding_generic_error(monkeypatch):
     """
     Verify that a non-RuntimeError exception in the embedding pipeline
-    surfaces as HTTP 500 (the generic catch-all in routes.py).
+    surfaces as HTTP 500 (the generic catch-all in the service layer).
     """
 
     async def mock_embed_text_value_error(text: str):
         raise ValueError("Unexpected data format")
 
-    import deepdive.api.routes as routes_module
+    import deepdive.api.services as svc_module
 
-    monkeypatch.setattr(routes_module, "embed_text", mock_embed_text_value_error)
+    monkeypatch.setattr(svc_module, "embed_text", mock_embed_text_value_error)
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
@@ -207,15 +206,15 @@ async def test_create_pubmed_embedding_generic_error(monkeypatch):
 async def test_augment_indications_query_generic_error(monkeypatch):
     """
     Verify that a non-RuntimeError exception in the query pipeline
-    surfaces as HTTP 500 (the generic catch-all in routes.py).
+    surfaces as HTTP 500 (the generic catch-all in the service layer).
     """
 
     async def mock_embed_text_type_error(text: str):
         raise TypeError("Bad type in embedding computation")
 
-    import deepdive.api.routes as routes_module
+    import deepdive.api.services as svc_module
 
-    monkeypatch.setattr(routes_module, "embed_text", mock_embed_text_type_error)
+    monkeypatch.setattr(svc_module, "embed_text", mock_embed_text_type_error)
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"

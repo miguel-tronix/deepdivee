@@ -11,6 +11,7 @@ Use `get_embedder()` to get the singleton instance configured via settings.
 from __future__ import annotations
 
 import asyncio
+import functools
 import threading
 from typing import Protocol, runtime_checkable
 
@@ -43,6 +44,9 @@ class LocalEmbedder:
 
     `SentenceTransformer.encode()` is CPU/GPU-bound and synchronous, so we
     offload it to a thread pool to keep the async event loop unblocked.
+
+    The underlying ``_encode`` method is LRU-cached so the full model
+    inference is skipped when the same text is embedded more than once.
     """
 
     def __init__(self, model_name: str) -> None:
@@ -52,13 +56,13 @@ class LocalEmbedder:
         self._model = SentenceTransformer(model_name)
         self._model_name = model_name
 
+    @functools.lru_cache(maxsize=2048)
+    def _encode(self, text: str) -> list[float]:
+        return self._model.encode(text, convert_to_numpy=True).tolist()
+
     async def embed(self, text: str) -> list[float]:
         loop = asyncio.get_running_loop()
-        vector: list[float] = await loop.run_in_executor(
-            None,  # default ThreadPoolExecutor
-            lambda: self._model.encode(text, convert_to_numpy=True).tolist(),
-        )
-        return vector
+        return await loop.run_in_executor(None, self._encode, text)
 
 
 # ---------------------------------------------------------------------------

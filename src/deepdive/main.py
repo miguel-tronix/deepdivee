@@ -1,5 +1,9 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+
+from deepdive.api.exceptions import DeepDiveError
 from deepdive.api.routes import router as api_router
 from deepdive.core.config import settings
 from deepdive.agent.embedders import initialise_embedder
@@ -23,6 +27,12 @@ app = FastAPI(
     description="DeepDive RAG Agent - specialized in contra-indications",
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(DeepDiveError)
+async def deepdive_error_handler(request: Request, exc: DeepDiveError):
+    return JSONResponse(status_code=exc.status_code, content={"detail": str(exc)})
+
 
 app.include_router(api_router, prefix="/api")
 

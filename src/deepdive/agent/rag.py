@@ -9,10 +9,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from deepdive.db import repository
 from deepdive.agent.embedders import get_embedder
 
+# Simple async-safe LRU cache for embedding results.
+# functools.lru_cache cannot be used directly on async functions (it caches
+# the coroutine object, not the result).  This dict-based cache with a
+# max-size eviction policy avoids repeated model-inference or API calls
+# when the same text is embedded more than once.
+_embed_cache: dict[str, list[float]] = {}
+_MAX_EMBED_CACHE = 2048
 
 async def embed_text(text: str) -> list[float]:
-    embedder = get_embedder()
-    return await embedder.embed(text)
+    try:
+        return _embed_cache[text]
+    except KeyError:
+        embedder = get_embedder()
+        vector = await embedder.embed(text)
+        if len(_embed_cache) >= _MAX_EMBED_CACHE:
+            _embed_cache.pop(next(iter(_embed_cache)))
+        _embed_cache[text] = vector
+        return vector
 
 
 async def retrieve_context(query: str, db: AsyncSession, top_k: int = 5) -> str:
