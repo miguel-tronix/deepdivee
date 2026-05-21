@@ -2,6 +2,14 @@ from typing import Protocol, runtime_checkable
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from deepdive.agent.agent import analyze_with_agent
+from deepdive.agent.memory import memory_store
+from deepdive.agent.rag import embed_text
+from deepdive.api.exceptions import (
+    AnalysisError,
+    DatabaseError,
+    EmbeddingServiceError,
+)
 from deepdive.api.schemas import (
     IndicationMatch,
     PubMedEmbeddingRequest,
@@ -9,16 +17,7 @@ from deepdive.api.schemas import (
     RAGRequest,
     RAGResponse,
 )
-from deepdive.api.exceptions import (
-    AnalysisError,
-    DatabaseError,
-    EmbeddingServiceError,
-)
-from deepdive.agent.agent import analyze_with_agent
-from deepdive.agent.memory import memory_store
-from deepdive.agent.rag import embed_text
 from deepdive.db import repository
-
 
 # ---------------------------------------------------------------------------
 # Protocols
@@ -31,8 +30,7 @@ class EmbeddingService(Protocol):
         self,
         request: PubMedEmbeddingRequest,
         db: AsyncSession,
-    ) -> PubMedEmbeddingResponse:
-        ...
+    ) -> PubMedEmbeddingResponse: ...
 
 
 @runtime_checkable
@@ -41,14 +39,12 @@ class IndicationService(Protocol):
         self,
         question: str,
         db: AsyncSession,
-    ) -> list[IndicationMatch]:
-        ...
+    ) -> list[IndicationMatch]: ...
 
 
 @runtime_checkable
 class ContraindicationService(Protocol):
-    async def analyze(self, request: RAGRequest) -> RAGResponse:
-        ...
+    async def analyze(self, request: RAGRequest) -> RAGResponse: ...
 
 
 # ---------------------------------------------------------------------------
@@ -126,4 +122,4 @@ def get_indication_service() -> IndicationService:
 
 
 def get_contraindication_service() -> ContraindicationService:
-    return AgentContraindicationServicea
+    return AgentContraindicationService
