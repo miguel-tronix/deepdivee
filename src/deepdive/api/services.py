@@ -126,4 +126,4 @@ def get_indication_service() -> IndicationService:
 
 
 def get_contraindication_service() -> ContraindicationService:
-    return AgentContraindicationService()
+    return AgentContraindicationServicea
