@@ -8,6 +8,7 @@ routes to avoid duplication.
 from sqlalchemy.ext.asyncio import AsyncSession
 from deepdive.db import repository
 from deepdive.agent.embedders import get_embedder
+from deepdive.agent.templating import render
 
 # Simple async-safe LRU cache for embedding results.
 # functools.lru_cache cannot be used directly on async functions (it caches
@@ -41,7 +42,7 @@ async def retrieve_context(query: str, db: AsyncSession, top_k: int = 5) -> str:
         return ""
 
     context_chunks = [
-        f"PMID: {m['pmid']}\nTitle: {m['title']}\nAbstract: {m['content']}"
+        render("context_chunk.jinja2", pmid=m["pmid"], title=m["title"], content=m["content"])
         for m in matches
     ]
     return "\n\n---\n\n".join(context_chunks)

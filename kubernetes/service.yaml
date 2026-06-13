@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: deepdive-api
+  namespace: deepdive
+  labels:
+    app: deepdive
+spec:
+  selector:
+    app: deepdive
+  ports:
+    - protocol: TCP
+      port: 443
+      targetPort: https
+  type: ClusterIP
