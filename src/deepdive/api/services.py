@@ -60,7 +60,7 @@ class PubMedEmbeddingService:
     ) -> PubMedEmbeddingResponse:
         try:
             vector = await embed_text(request.abstract)
-            await repository.insert_pubmed_embedding(
+            _ = await repository.insert_pubmed_embedding(
                 db=db,
                 pmid=request.pmid,
                 title=request.title,
@@ -122,4 +122,4 @@ def get_indication_service() -> IndicationService:
 
 
 def get_contraindication_service() -> ContraindicationService:
-    return AgentContraindicationService
+    return AgentContraindicationService()
