@@ -8,3 +8,12 @@ wheels/
 
 # Virtual environments
 .venv
+# VS Code
+.vscode
+.vscode/*
+# Pytest
+.pytest_cache
+
+# MyPy
+.mypy_caches
+

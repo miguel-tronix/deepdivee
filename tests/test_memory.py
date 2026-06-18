@@ -23,16 +23,16 @@ async def test_init_stores_redis_url():
 
 async def test_initialize_creates_client_and_checkpointer(monkeypatch):
     from deepdive.agent import memory as mem_module
-    from deepdive.agent.memory import AgentMemory, RedisSaver
+    from deepdive.agent.memory import AgentMemory, AsyncRedisSaver
 
     mem = AgentMemory("redis://test:6379/0")
 
     fake_client = AsyncMock()
-    fake_checkpointer = MagicMock(spec=RedisSaver)
+    fake_checkpointer = MagicMock(spec=AsyncRedisSaver)
 
     monkeypatch.setattr(mem_module.aioredis, "from_url", lambda url, decode_responses: fake_client)
 
-    monkeypatch.setattr(mem_module, "RedisSaver", lambda async_client: fake_checkpointer)
+    monkeypatch.setattr(mem_module, "AsyncRedisSaver", lambda redis_client: fake_checkpointer)
 
     await mem.initialize()
 
