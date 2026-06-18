@@ -13,3 +13,7 @@ wheels/
 .vscode/*
 # Pytest
 .pytest_cache
+
+# MyPy
+.mypy_caches
+

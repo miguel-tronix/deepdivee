@@ -12,7 +12,7 @@ import logging
 from typing import Optional
 
 import redis.asyncio as aioredis
-from langgraph.checkpoint.redis import RedisSaver
+from langgraph.checkpoint.redis import AsyncRedisSaver
 
 from deepdive.core.config import settings
 
@@ -27,11 +27,11 @@ class AgentMemory:
     def __init__(self, redis_url: str) -> None:
         self.redis_url = redis_url
         self._client: Optional[aioredis.Redis] = None
-        self.checkpointer: Optional[RedisSaver] = None
+        self.checkpointer: Optional[AsyncRedisSaver] = None
 
     async def initialize(self) -> None:
         self._client = aioredis.from_url(self.redis_url, decode_responses=True)
-        self.checkpointer = RedisSaver(async_client=self._client)
+        self.checkpointer = AsyncRedisSaver(redis_client=self._client)
 
     async def close(self) -> None:
         if self._client:

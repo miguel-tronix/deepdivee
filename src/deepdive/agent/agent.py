@@ -47,6 +47,20 @@ async def analyze_with_agent(intervention: str) -> str:
     prompt = render("analysis_prompt.jinja2", intervention=intervention)
     agent = await get_agent()
     result = await agent.run_async(prompt)
+    output = result.final_output
+    if isinstance(output, str):
+        output_str = output
+    elif output is None:
+        output_str = ""
+    else:
+        import json
+        import pydantic
+        if isinstance(output, pydantic.BaseModel):
+            output_str = output.model_dump_json()
+        elif isinstance(output, dict):
+            output_str = json.dumps(output)
+        else:
+            output_str = str(output)
 
     session_id = f"intervention:{intervention}"
     await memory_store.add_to_history(
@@ -57,10 +71,10 @@ async def analyze_with_agent(intervention: str) -> str:
     await memory_store.add_to_history(
         session_id=session_id,
         role="assistant",
-        content=result.final_output,
+        content=output_str,
     )
 
-    return result.final_output
+    return output_str
 
 
 async def cleanup_agent() -> None:

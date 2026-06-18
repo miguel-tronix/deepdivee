@@ -42,3 +42,13 @@ asyncio_mode = "strict"
 venvPath = "."
 venv = ".venv"
 extraPaths = ["src"]
+
+[tool.mypy]
+mypy_path = "src"
+explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = [
+    "pgvector.sqlalchemy.*",
+]
+ignore_missing_imports = true
