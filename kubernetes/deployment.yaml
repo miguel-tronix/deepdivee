@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deepdive-api
+  namespace: deepdive
+  labels:
+    app: deepdive
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: deepdive
+  template:
+    metadata:
+      labels:
+        app: deepdive
+    spec:
+      containers:
+        - name: deepdive-api
+          image: localhost:32000/llm/agents/deepdivee:0.1.15
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: deepdive-config
+            - secretRef:
+                name: deepdive-secrets
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+        - name: tls-proxy
+          image: nginx:alpine
+          ports:
+            - containerPort: 8443
+              name: https
+          volumeMounts:
+            - name: tls-certs
+              mountPath: /etc/nginx/certs
+              readOnly: true
+            - name: nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx-tls.conf
+          livenessProbe:
+            tcpSocket:
+              port: 8443
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+      volumes:
+        - name: tls-certs
+          secret:
+            secretName: deepdive-tls-certs
+        - name: nginx-config
+          configMap:
+            name: deepdive-nginx-tls

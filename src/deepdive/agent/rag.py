@@ -8,6 +8,7 @@ routes to avoid duplication.
 from sqlalchemy.ext.asyncio import AsyncSession
 from deepdive.db import repository
 from deepdive.agent.embedders import get_embedder
+from deepdive.agent.templating import render
 
 # Simple async-safe LRU cache for embedding results.
 # functools.lru_cache cannot be used directly on async functions (it caches
@@ -16,6 +17,7 @@ from deepdive.agent.embedders import get_embedder
 # when the same text is embedded more than once.
 _embed_cache: dict[str, list[float]] = {}
 _MAX_EMBED_CACHE = 2048
+
 
 async def embed_text(text: str) -> list[float]:
     try:
@@ -41,7 +43,12 @@ async def retrieve_context(query: str, db: AsyncSession, top_k: int = 5) -> str:
         return ""
 
     context_chunks = [
-        f"PMID: {m['pmid']}\nTitle: {m['title']}\nAbstract: {m['content']}"
+        render(
+            "context_chunk.jinja2",
+            pmid=m["pmid"],
+            title=m["title"],
+            content=m["content"],
+        )
         for m in matches
     ]
     return "\n\n---\n\n".join(context_chunks)
@@ -67,6 +74,3 @@ async def retrieve_pubmed_context(search_query: str) -> str:
     async with AsyncSessionLocal() as db:
         result = await retrieve_context(search_query, db, top_k=5)
     return result or "No relevant PubMed literature found for this query."
-
-
-
