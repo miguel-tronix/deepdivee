@@ -32,13 +32,14 @@ async def get_agent() -> Any:
         async with _agent_lock:
             if _agent is None:
                 await memory_store.initialize()
-                
+
+                from pydantic import SecretStr
                 model = ChatOpenAI(
                     model=settings.llm_model,
-                    api_key=settings.llm_api_key,
+                    api_key=SecretStr(settings.llm_api_key),
                     base_url=settings.llm_api_base,
                 )
-                
+
                 _agent = create_react_agent(
                     model=model,
                     tools=[retrieve_pubmed_context],
@@ -51,10 +52,10 @@ async def get_agent() -> Any:
 async def analyze_with_agent(intervention: str) -> str:
     prompt = render("analysis_prompt.jinja2", intervention=intervention)
     agent = await get_agent()
-    
+
     session_id = f"intervention:{intervention}"
     config = {"configurable": {"thread_id": session_id}}
-    
+
     result = await agent.ainvoke({"messages": [("user", prompt)]}, config=config)
     output_str = result["messages"][-1].content
 
