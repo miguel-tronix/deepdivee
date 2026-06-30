@@ -56,6 +56,73 @@ async def retrieve_context(query: str, db: AsyncSession, top_k: int = 5) -> str:
 
 
 @tool
+async def refine_search_query(original_query: str, refinement_reasoning: str) -> str:
+    """Refine a search query based on feedback from the LLM.
+
+    Use this tool to improve search queries when the LLM believes the retrieved
+    context is insufficient, unclear, or needs more specific focus.
+
+    Args:
+        original_query: The initial search query that was used
+        refinement_reasoning: Detailed explanation of why the query needs refinement,
+                             including what specific aspects are missing or unclear,
+                             alternative search strategies to try, or medical
+                             terminology that should be included/excluded.
+
+    Returns:
+        The improved search query with better medical terminology,
+        expanded scope, or more specific focus area.
+    """
+    original_lower = original_query.lower()
+    reasoning_lower = refinement_reasoning.lower()
+
+    refinements = []
+
+    if "age" in reasoning_lower or "elderly" in reasoning_lower:
+        refinements.append(" (age-related)")
+
+    if "pediatric" in reasoning_lower or "children" in reasoning_lower or "youth" in reasoning_lower:
+        refinements.append(" (pediatric)")
+
+    if "contra-indication" in reasoning_lower or "side effect" in reasoning_lower or "adverse" in reasoning_lower:
+        refinements.append(" (contra-indications)")
+
+    if "drug" in reasoning_lower and "class" in reasoning_lower:
+        refinements.append(" (drug class)")
+
+    if "specific" in reasoning_lower or "more precise" in reasoning_lower or "particular" in reasoning_lower:
+        refinements.append(" (more specific)")
+
+    if "population" in reasoning_lower or "group" in reasoning_lower:
+        refinements.append(" (population-specific)")
+
+    if "dose" in reasoning_lower or "dosage" in reasoning_lower:
+        refinements.append(" (dosage-related)")
+
+    if " comorbidity" in reasoning_lower or "comorbid" in reasoning_lower:
+        refinements.append(" (with comorbidities)")
+
+    if "interaction" in reasoning_lower or "drug interaction" in reasoning_lower:
+        refinements.append(" (drug interactions)")
+
+    if "surgical" in reasoning_lower or "pre-operative" in reasoning_lower or "post-operative" in reasoning_lower:
+        refinements.append(" (surgical)")
+
+    if not refinements:
+        if "expand" in reasoning_lower or "broader" in reasoning_lower or "wider" in reasoning_lower:
+            refinements.append(" (expanded scope)")
+        elif "narrow" in reasoning_lower or "more specific" in reasoning_lower:
+            refinements.append(" (more specific)")
+        elif "different" in reasoning_lower or "alternative" in reasoning_lower:
+            refinements.append(" (alternative approach)")
+        else:
+            refinements.append(" (improved)")
+
+    refined = original_query + "".join(refinements)
+    return refined
+
+
+@tool
 async def retrieve_pubmed_context(search_query: str) -> str:
     """Search PubMed abstracts via vector similarity and return relevant context.
 

@@ -3,5 +3,11 @@ Analyse the following intervention and list its major contra-indications.
 Intervention: {{ intervention }}
 
 First, generate a detailed search query and call retrieve_pubmed_context
-to get the relevant literature. Then provide your analysis based strictly
+to get the relevant literature. 
+
+Review the retrieved context and consider if additional search refinement is needed:
+- If the context is insufficient, unclear, or missing key details, request a refined search with more specific medical terminology
+- If you need context from a different angle (age groups, drug classes, specific populations), call refine_search_query
+
+After retrieving sufficient context, provide your analysis based strictly
 on the retrieved context.

@@ -7,10 +7,18 @@ When asked to analyse a medical intervention, follow these steps:
    related terms, drug classes, and condition synonyms.
 2. Call the `retrieve_pubmed_context` tool with your improved query
    to get relevant PubMed literature.
-3. Based strictly on the retrieved context, list the major
+3. Review the retrieved context and check if it's sufficient to answer
+   the analysis question:
+   - If the context is clear, comprehensive, and directly relevant
+     to the intervention, proceed to step 4.
+   - If the context is insufficient, unclear, or missing key details,
+     or you need information from a different angle, call the
+     `refine_search_query` tool with:
+     - The original search query
+     - A detailed reasoning for why refinement is needed
+   - Repeat steps 2-3 as needed until you have sufficient context.
+4. Based strictly on the retrieved context, list the major
    contra-indications with PMID citations where available.
-4. If the retrieved context is empty or insufficient, try a different
-   search query to find more relevant results before giving up.
 5. If no relevant literature can be found after multiple attempts,
    state that no PubMed evidence was found — do not make up or infer
    contra-indications without literature support.

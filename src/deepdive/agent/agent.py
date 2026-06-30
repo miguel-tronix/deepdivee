@@ -17,7 +17,7 @@ from langgraph.prebuilt import create_react_agent
 
 from deepdive.core.config import settings
 from deepdive.agent.memory import memory_store
-from deepdive.agent.rag import retrieve_pubmed_context
+from deepdive.agent.rag import retrieve_pubmed_context, refine_search_query
 from deepdive.agent.templating import render
 
 _INSTRUCTIONS = render("system_prompt.jinja2")
@@ -42,7 +42,7 @@ async def get_agent() -> Any:
 
                 _agent = create_react_agent(
                     model=model,
-                    tools=[retrieve_pubmed_context],
+                    tools=[retrieve_pubmed_context, refine_search_query],
                     checkpointer=memory_store.checkpointer,
                     state_modifier=_INSTRUCTIONS,
                 )
@@ -50,20 +50,21 @@ async def get_agent() -> Any:
 
 
 async def analyze_with_agent(intervention: str) -> str:
-    prompt = render("analysis_prompt.jinja2", intervention=intervention)
     agent = await get_agent()
 
     session_id = f"intervention:{intervention}"
     config = {"configurable": {"thread_id": session_id}}
-
-    result = await agent.ainvoke({"messages": [("user", prompt)]}, config=config)
-    output_str = result["messages"][-1].content
 
     await memory_store.add_to_history(
         session_id=session_id,
         role="user",
         content=f"Analyse contra-indications for: {intervention}",
     )
+
+    prompt = render("analysis_prompt.jinja2", intervention=intervention)
+    result = await agent.ainvoke({"messages": [("user", prompt)]}, config=config)
+    output_str = result["messages"][-1].content
+
     await memory_store.add_to_history(
         session_id=session_id,
         role="assistant",
@@ -71,6 +72,10 @@ async def analyze_with_agent(intervention: str) -> str:
     )
 
     return output_str
+
+
+async def get_agent_state(session_id: str) -> dict:
+    return await memory_store.get_history(session_id)
 
 
 async def cleanup_agent() -> None:
