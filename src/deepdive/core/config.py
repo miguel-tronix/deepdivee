@@ -1,4 +1,3 @@
-from typing import Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
@@ -28,16 +27,11 @@ class Settings(BaseSettings):
     llm_api_base: str = Field(default="http://localhost:8000/v1")
     llm_api_key: str = Field(default="dummy")
 
-    # Local Embedding Settings
-    embedding_device: str = Field(default="auto")  # "auto", "cpu", "cuda"
-    embedding_batch_size: int = Field(default=32)
-    embedding_trust_remote_code: bool = Field(default=False)
+    # Embedding settings — remote Embitious service (POST /embed)
+    embedding_api_url: str = Field(default="http://localhost:8080")
+    embedding_timeout: float = Field(default=30.0)
 
-    # Embedding settings
-    embedding_backend: Literal["local", "openai"] = Field(default="local")
-    embedding_model: str = Field(default="all-MiniLM-L6-v2")
-
-    # Embedding dimension (must match the model in use)
+    # Embedding dimension (must match the model served by the embedding API)
     # all-MiniLM-L6-v2 → 384
     embedding_dimension: int = Field(default=384)
 
