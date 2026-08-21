@@ -15,7 +15,7 @@ from deepdive.main import app
 # Constants
 # ---------------------------------------------------------------------------
 
-EMBEDDING_DIM = 768  # nomic-embed-text default dimension
+EMBEDDING_DIM = 384  # all-MiniLM-L6-v2 dimension (matches default settings)
 FAKE_VECTOR = [0.1] * EMBEDDING_DIM
 
 
@@ -35,13 +35,13 @@ async def async_client():
 
 @pytest.fixture
 def fake_vector():
-    """A 768-dimension fake embedding vector."""
+    """A 384-dimension fake embedding vector."""
     return FAKE_VECTOR.copy()
 
 
 @pytest.fixture
 def mock_embed_text_success():
-    """An async mock for embed_text that returns a valid 768-dim vector."""
+    """An async mock for embed_text that returns a valid 384-dim vector."""
 
     async def _mock(text: str):
         return FAKE_VECTOR

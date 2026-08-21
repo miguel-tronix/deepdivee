@@ -14,7 +14,7 @@ graph TD
     Redis -->|Cache Miss| Agent[LangGraph ReAct Agent]
     
     subgraph Ingestion & Search
-        PubMed[PubMed Abstracts] -->|POST /api/embeddings| Embedder[Local SentenceTransformer / OpenAI]
+        PubMed[PubMed Abstracts] -->|POST /api/embeddings| Embedder[Embitious Embedding Service]
         Embedder -->|Vector Embeddings| PG[(PostgreSQL + pgvector)]
     end
     
@@ -32,6 +32,7 @@ graph TD
 ## 🚀 Key Features
 
 * **Semantic Literature Search:** Stores PubMed abstract embeddings in PostgreSQL using `pgvector` to run cosine similarity queries.
+* **External Embedding Service:** Vector embeddings are computed by the [Embitious](../embitious) service (`POST /embed`) — no ML runtime in this process.
 * **Autonomous ReAct Loop:** Employs a `LangGraph` agent that dynamically searches scientific literature, evaluates conditions, and refines queries.
 * **Persistent Session State:** Utilizes `AsyncRedisSaver` as a checkpointer to persist conversation history and agent trajectories.
 * **High-Speed Caching:** Caches synthesized contraindication reports in Redis with a configurable TTL (default: 1 hour).
@@ -43,8 +44,9 @@ graph TD
 ## 🛠️ Tech Stack
 
 * **Core:** Python 3.12+, FastAPI, SQLAlchemy 2.0 (with `asyncpg`)
-* **Agent:** LangGraph, any-agent, any-llm-sdk
+* **Agent:** LangGraph, LangChain
 * **Database & Memory:** PostgreSQL, pgvector, Redis, redis-py
+* **Embeddings:** Embitious embedding service (Java/Quarkus + DJL)
 * **Workflow & Quality:** Ruff, Mypy, Pytest
 
 ---
@@ -66,9 +68,9 @@ Create a `.env` file in the root directory to customize the agent's behavior:
 | `LLM_API_BASE` | Custom base URL for LLM completion API | `"http://localhost:8000/v1"` |
 | `LLM_API_KEY` | API key for LLM provider | `"dummy"` |
 | `LLM_MODEL` | LLM model version | `"gpt-4o"` |
-| `EMBEDDING_BACKEND` | Local embedding or OpenAI endpoint (`local` or `openai`) | `"local"` |
-| `EMBEDDING_MODEL` | HuggingFace model name for local embeddings | `"all-MiniLM-L6-v2"` |
-| `EMBEDDING_DIMENSION`| Dimensionality of the vector embeddings | `384` |
+| `EMBEDDING_API_URL` | Base URL of the Embitious embedding service (`POST /embed`) | `"http://localhost:8080"` |
+| `EMBEDDING_TIMEOUT` | Timeout in seconds for embedding API calls | `30.0` |
+| `EMBEDDING_DIMENSION`| Dimensionality of the vector embeddings (must match the model served by Embitious) | `384` |
 
 ---
 
