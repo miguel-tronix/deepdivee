@@ -7,6 +7,7 @@ routes to avoid duplication.
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from deepdive.db import repository
+from langchain_core.tools import tool
 from deepdive.agent.embedders import get_embedder
 from deepdive.agent.templating import render
 
@@ -54,6 +55,7 @@ async def retrieve_context(query: str, db: AsyncSession, top_k: int = 5) -> str:
     return "\n\n---\n\n".join(context_chunks)
 
 
+@tool
 async def retrieve_pubmed_context(search_query: str) -> str:
     """Search PubMed abstracts via vector similarity and return relevant context.
 

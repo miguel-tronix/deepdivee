@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from deepdive.api.exceptions import DeepDiveError
 from deepdive.api.routes import router as api_router
 from deepdive.core.config import settings
-from deepdive.agent.embedders import initialise_embedder
+from deepdive.agent.embedders import close_embedder, initialise_embedder
 from deepdive.agent.memory import memory_store
 from deepdive.agent.agent import cleanup_agent
 
@@ -19,6 +19,7 @@ async def lifespan(app: FastAPI):
     yield
     await memory_store.close()
     await cleanup_agent()
+    await close_embedder()
 
 
 app = FastAPI(

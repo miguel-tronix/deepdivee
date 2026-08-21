@@ -1,17 +1,14 @@
 """
 Embedding abstraction layer.
 
-Defines an `Embedder` Protocol and two concrete implementations:
-  - `LocalEmbedder`  — HuggingFace sentence-transformers (runs locally)
-  - `OpenAIEmbedder` — OpenAI-compatible /embeddings API via httpx
-
-Use `get_embedder()` to get the singleton instance configured via settings.
+Embeddings are computed by the external Embitious service (Quarkus/DJL),
+exposing ``POST /embed`` with ``{"text": ...}`` and returning
+``{"embedding": [...]}``. This module provides an async client for that
+endpoint plus a singleton factory used at app startup.
 """
 
 from __future__ import annotations
 
-import asyncio
-import functools
 import threading
 from typing import Protocol, runtime_checkable
 
@@ -34,63 +31,28 @@ class Embedder(Protocol):
 
 
 # ---------------------------------------------------------------------------
-# Local (HuggingFace sentence-transformers)
+# Remote (Embitious) embedding API
 # ---------------------------------------------------------------------------
 
 
-class LocalEmbedder:
+class RemoteEmbedder:
     """
-    Runs a sentence-transformers model locally.
+    Calls the Embitious embedding service via httpx.
 
-    `SentenceTransformer.encode()` is CPU/GPU-bound and synchronous, so we
-    offload it to a thread pool to keep the async event loop unblocked.
-
-    The underlying ``_encode`` method is LRU-cached so the full model
-    inference is skipped when the same text is embedded more than once.
+    The service is a drop-in embedding endpoint: ``POST /embed`` with a JSON
+    body ``{"text": ...}`` responds with ``{"embedding": [...]}``.
     """
 
-    def __init__(self, model_name: str) -> None:
-        # Import here so the heavy library isn't loaded unless LocalEmbedder is used
-        from sentence_transformers import SentenceTransformer
-
-        self._model = SentenceTransformer(model_name)
-        self._model_name = model_name
-
-    @functools.lru_cache(maxsize=2048)
-    def _encode(self, text: str) -> list[float]:
-        return self._model.encode(text, convert_to_numpy=True).tolist()
-
-    async def embed(self, text: str) -> list[float]:
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, self._encode, text)
-
-
-# ---------------------------------------------------------------------------
-# OpenAI-compatible API
-# ---------------------------------------------------------------------------
-
-
-class OpenAIEmbedder:
-    """
-    Calls an OpenAI-compatible /embeddings endpoint via httpx.
-    Works with OpenAI, Azure OpenAI, or any local proxy (LiteLLM, vLLM, etc.).
-    """
-
-    def __init__(self, client: httpx.AsyncClient, model: str) -> None:
+    def __init__(self, client: httpx.AsyncClient) -> None:
         self._client = client
-        self._model = model
 
     async def embed(self, text: str) -> list[float]:
         try:
-            response = await self._client.post(
-                "/embeddings",
-                json={"input": text, "model": self._model},
-                headers={"Authorization": f"Bearer {settings.llm_api_key}"},
-            )
+            response = await self._client.post("/embed", json={"text": text})
             response.raise_for_status()
-            return response.json()["data"][0]["embedding"]
+            return response.json()["embedding"]
         except Exception as e:
-            raise RuntimeError(f"OpenAI embedding request failed: {e}") from e
+            raise RuntimeError(f"Remote embedding request failed: {e}") from e
 
 
 # ---------------------------------------------------------------------------
@@ -100,16 +62,17 @@ class OpenAIEmbedder:
 # Module-level singleton — populated by get_embedder() on first call or
 # explicitly at app startup via initialise_embedder().
 _embedder: Embedder | None = None
+_client: httpx.AsyncClient | None = None
 _embedder_lock = threading.Lock()
 
 
 def initialise_embedder() -> Embedder:
     """
     Build and cache the embedder singleton.  Call this once at app startup
-    (e.g. inside FastAPI's lifespan context) so the model is warm before
+    (inside FastAPI's lifespan context) so the HTTP client is warm before
     the first request arrives.
     """
-    global _embedder
+    global _embedder, _client
     if _embedder is not None:
         return _embedder
 
@@ -117,20 +80,11 @@ def initialise_embedder() -> Embedder:
         if _embedder is not None:
             return _embedder
 
-        backend = settings.embedding_backend
-        model = settings.embedding_model
-
-        if backend == "local":
-            _embedder = LocalEmbedder(model_name=model)
-        elif backend == "openai":
-            _http_client = httpx.AsyncClient(
-                base_url=settings.llm_api_base,
-                timeout=30.0,
-            )
-            _embedder = OpenAIEmbedder(client=_http_client, model=model)
-        else:
-            raise ValueError(f"Unknown embedding backend: {backend!r}")
-
+        _client = httpx.AsyncClient(
+            base_url=settings.embedding_api_url,
+            timeout=settings.embedding_timeout,
+        )
+        _embedder = RemoteEmbedder(client=_client)
         return _embedder
 
 
@@ -144,3 +98,13 @@ def get_embedder() -> Embedder:
     if _embedder is None:
         return initialise_embedder()
     return _embedder
+
+
+async def close_embedder() -> None:
+    """Dispose of the embedder singleton and its HTTP client."""
+    global _embedder, _client
+    with _embedder_lock:
+        if _client is not None:
+            await _client.aclose()
+        _client = None
+        _embedder = None

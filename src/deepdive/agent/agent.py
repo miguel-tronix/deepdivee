@@ -1,8 +1,8 @@
 """
 AnyAgent wrapper for contra-indication analysis.
 
-Uses `any-agent` with the LangChain framework to create a portable
-agent that leverages `any-llm` under the hood, uses a PubMed vector-search
+Uses LangGraph and LangChain to create a portable
+agent that leverages OpenAI-compatible models under the hood, uses a PubMed vector-search
 tool to retrieve relevant literature, and supports Redis-backed memory
 via LangGraph checkpointers.
 """
@@ -10,9 +10,10 @@ via LangGraph checkpointers.
 from __future__ import annotations
 
 import asyncio
-from typing import Optional
+from typing import Any
 
-from any_agent import AgentConfig, AnyAgent
+from langchain_openai import ChatOpenAI
+from langgraph.prebuilt import create_react_agent
 
 from deepdive.core.config import settings
 from deepdive.agent.memory import memory_store
@@ -21,24 +22,29 @@ from deepdive.agent.templating import render
 
 _INSTRUCTIONS = render("system_prompt.jinja2")
 
-_agent: Optional[AnyAgent] = None
+_agent: Any = None
 _agent_lock = asyncio.Lock()
 
 
-async def get_agent() -> AnyAgent:
+async def get_agent() -> Any:
     global _agent
     if _agent is None:
         async with _agent_lock:
             if _agent is None:
                 await memory_store.initialize()
-                _agent = await AnyAgent.create_async(
-                    "langchain",
-                    AgentConfig(
-                        model_id=f"{settings.llm_provider}:{settings.llm_model}",
-                        instructions=_INSTRUCTIONS,
-                        tools=[retrieve_pubmed_context],
-                        agent_args={"checkpointer": memory_store.checkpointer},
-                    ),
+
+                from pydantic import SecretStr
+                model = ChatOpenAI(
+                    model=settings.llm_model,
+                    api_key=SecretStr(settings.llm_api_key),
+                    base_url=settings.llm_api_base,
+                )
+
+                _agent = create_react_agent(
+                    model=model,
+                    tools=[retrieve_pubmed_context],
+                    checkpointer=memory_store.checkpointer,
+                    state_modifier=_INSTRUCTIONS,
                 )
     return _agent
 
@@ -46,23 +52,13 @@ async def get_agent() -> AnyAgent:
 async def analyze_with_agent(intervention: str) -> str:
     prompt = render("analysis_prompt.jinja2", intervention=intervention)
     agent = await get_agent()
-    result = await agent.run_async(prompt)
-    output = result.final_output
-    if isinstance(output, str):
-        output_str = output
-    elif output is None:
-        output_str = ""
-    else:
-        import json
-        import pydantic
-        if isinstance(output, pydantic.BaseModel):
-            output_str = output.model_dump_json()
-        elif isinstance(output, dict):
-            output_str = json.dumps(output)
-        else:
-            output_str = str(output)
 
     session_id = f"intervention:{intervention}"
+    config = {"configurable": {"thread_id": session_id}}
+
+    result = await agent.ainvoke({"messages": [("user", prompt)]}, config=config)
+    output_str = result["messages"][-1].content
+
     await memory_store.add_to_history(
         session_id=session_id,
         role="user",
@@ -79,6 +75,4 @@ async def analyze_with_agent(intervention: str) -> str:
 
 async def cleanup_agent() -> None:
     global _agent
-    if _agent is not None:
-        await _agent.cleanup_async()
-        _agent = None
+    _agent = None
